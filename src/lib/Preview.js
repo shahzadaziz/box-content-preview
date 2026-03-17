@@ -996,6 +996,12 @@ class Preview extends EventEmitter {
         // Optional additional query params to append to requests
         this.options.queryParams = options.queryParams || {};
 
+        // Accessibility scale factor for OS-level zoom settings (e.g., WKWebView)
+        this.options.accessibilityScale = parseFloat(options.accessibilityScale) || 1;
+        if (this.options.accessibilityScale < 1) {
+            this.options.accessibilityScale = 1;
+        }
+
         // Option to patch AMD module definitions while Preview loads the third party dependencies it expects in the
         // browser global scope. Definitions will be re-enabled on the 'assetsloaded' event
         this.options.fixDependencies = !!options.fixDependencies || !!options.pauseRequireJS;

@@ -1476,6 +1476,26 @@ describe('lib/Preview', () => {
 
             expect(preview.options.features).toEqual({});
         });
+
+        test('should parse accessibilityScale as float and set on options', () => {
+            preview.parseOptions({ ...preview.previewOptions, accessibilityScale: '1.5' });
+            expect(preview.options.accessibilityScale).toBe(1.5);
+        });
+
+        test('should default accessibilityScale to 1 when not provided', () => {
+            preview.parseOptions(preview.previewOptions);
+            expect(preview.options.accessibilityScale).toBe(1);
+        });
+
+        test('should clamp accessibilityScale to 1 when value is less than 1', () => {
+            preview.parseOptions({ ...preview.previewOptions, accessibilityScale: 0.5 });
+            expect(preview.options.accessibilityScale).toBe(1);
+        });
+
+        test('should default accessibilityScale to 1 when value is NaN', () => {
+            preview.parseOptions({ ...preview.previewOptions, accessibilityScale: 'invalid' });
+            expect(preview.options.accessibilityScale).toBe(1);
+        });
     });
 
     describe('createViewerOptions()', () => {

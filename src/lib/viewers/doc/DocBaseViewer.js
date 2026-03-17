@@ -95,6 +95,8 @@ const SAFARI_PRINT_TIMEOUT_MS = 1000; // Wait 1s before trying to print
 const SCROLL_EVENT_THROTTLE_INTERVAL = 200;
 const THUMBNAILS_SIDEBAR_TRANSITION_TIME = 301; // 301ms
 const THUMBNAILS_SIDEBAR_TOGGLED_MAP_KEY = 'doc-thumbnails-toggled-map';
+// Must match $thumbnail-sidebar-width in _docBase.scss (used for content left offset when thumbnails are zoomed)
+const THUMBNAIL_SIDEBAR_WIDTH_PX = 191;
 
 const MAX_OPERATIONS = 320000; // Block PDFs with more than 320,000 drawing operations
 const MAX_OPERATION_PAGES = 5; // Check only the first 5 pages
@@ -803,6 +805,76 @@ class DocBaseViewer extends BaseViewer {
     }
 
     /**
+     * Override: for Document viewer we do not set CSS zoom on the container. Applying both CSS zoom
+     * and PDF viewer scale would double-scale the document (canvas drawn at scale X then zoomed again)
+     * and degrade quality. We only apply scale via the PDF viewer (applyPdfAccessibilityScale) so
+     * the PDF is rendered at the correct resolution. Toolbar and thumbnails rail are scaled separately
+     * via applyAccessibilityScaleToChrome() so they match the user's accessibility zoom.
+     *
+     * @override
+     * @param {number} scale - Scale factor (e.g., 1.5 for 150%). Values <= 1 are ignored.
+     * @return {void}
+     */
+    applyAccessibilityScale(scale) {
+        if (!scale || scale <= 1) {
+            this.accessibilityScale = undefined;
+            this.applyAccessibilityScaleToChrome();
+            return;
+        }
+        this.accessibilityScale = scale;
+        // Do not set containerEl.style.zoom — would double-scale with PDF viewer scale and blur the document
+        this.applyAccessibilityScaleToChrome();
+    }
+
+    /**
+     * Applies accessibility scale (CSS zoom) to the toolbar and thumbnails rail only, so they match
+     * the document's accessibility zoom without scaling the PDF canvas (which stays sharp).
+     * Also sets .bp-content left offset when thumbnails are open so the scaled rail does not get
+     * overlapped by the PDF. Call from applyAccessibilityScale, loadUI(), and toggleThumbnails().
+     *
+     * @protected
+     * @return {void}
+     */
+    applyAccessibilityScaleToChrome() {
+        const scale = this.accessibilityScale;
+        const zoom = scale && scale > 1 ? scale : 1;
+
+        if (this.thumbnailsSidebarEl) {
+            this.thumbnailsSidebarEl.style.zoom = zoom;
+        }
+        if (this.controls && this.controls.controlsEl) {
+            this.controls.controlsEl.style.zoom = zoom;
+        }
+
+        // When thumbnails are zoomed they take more horizontal space; push content right so PDF doesn't overlap rail
+        const thumbnailsOpen = this.thumbnailsSidebar && this.thumbnailsSidebar.isOpen;
+        if (this.containerEl) {
+            if (scale > 1 && thumbnailsOpen) {
+                this.containerEl.style.left = `${THUMBNAIL_SIDEBAR_WIDTH_PX * scale}px`;
+            } else {
+                this.containerEl.style.left = '';
+            }
+        }
+    }
+
+    /**
+     * Applies accessibility scale to the PDF viewer so the document content (not just chrome) zooms.
+     * Call after pdfViewer has computed scale (e.g. after currentScaleValue = 'auto' and update()).
+     *
+     * @protected
+     * @return {void}
+     */
+    applyPdfAccessibilityScale() {
+        const scale = this.accessibilityScale;
+        if (!scale || scale <= 1 || !this.pdfViewer) {
+            return;
+        }
+        const baseScale = this.pdfViewer.currentScale;
+        const scaled = Math.min(MAX_SCALE, Math.max(MIN_SCALE, baseScale * scale));
+        this.pdfViewer.currentScaleValue = scaled;
+    }
+
+    /**
      * Handles keyboard events for document viewer.
      *
      * @param {string} key - keydown key
@@ -1074,8 +1146,10 @@ class DocBaseViewer extends BaseViewer {
 
         const { currentPageNumber } = this.pdfViewer;
 
-        this.pdfViewer.currentScaleValue = this.pdfViewer.currentScaleValue || 'auto';
+        // Recompute fit-to-width then apply accessibility so document content zooms with OS zoom
+        this.pdfViewer.currentScaleValue = 'auto';
         this.pdfViewer.update();
+        this.applyPdfAccessibilityScale();
 
         if (!this.docFirstPagesEnabled) {
             this.setPage(currentPageNumber);
@@ -1292,6 +1366,7 @@ class DocBaseViewer extends BaseViewer {
      */
     loadUI() {
         this.controls = new ControlsRoot({ containerEl: this.containerEl, fileId: this.options.file.id });
+        this.applyAccessibilityScaleToChrome(); // scale toolbar when accessibility scale is set
         this.annotationControlsFSM.subscribe(() => this.renderUI());
         this.renderUI();
     }
@@ -1400,6 +1475,8 @@ class DocBaseViewer extends BaseViewer {
      */
     pagesinitHandler() {
         this.pdfViewer.currentScaleValue = 'auto';
+        this.pdfViewer.update();
+        this.applyPdfAccessibilityScale();
         this.loadUI();
 
         const { pagesCount, currentScale } = this.pdfViewer;
@@ -1789,6 +1866,8 @@ class DocBaseViewer extends BaseViewer {
             metricName = USER_DOCUMENT_THUMBNAIL_EVENTS.OPEN;
             eventName = VIEWER_EVENT.thumbnailsOpen;
         }
+
+        this.applyAccessibilityScaleToChrome(); // update content left so PDF doesn't overlap scaled rail
 
         this.emitMetric({ name: metricName, data: pagesCount });
         this.emit(eventName);

@@ -236,6 +236,21 @@ class BaseViewer extends EventEmitter {
         }
 
         this.isSetup = true;
+        this.applyAccessibilityScale(this.options.accessibilityScale);
+    }
+
+    /**
+     * Applies accessibility scale (CSS zoom) to the content container for OS-level zoom settings (e.g., WKWebView).
+     *
+     * @param {number} scale - Scale factor (e.g., 1.5 for 150%). Values <= 1 are ignored.
+     * @return {void}
+     */
+    applyAccessibilityScale(scale) {
+        if (!this.containerEl || !scale || scale <= 1) {
+            return;
+        }
+        this.containerEl.style.zoom = scale;
+        this.accessibilityScale = scale;
     }
 
     /**

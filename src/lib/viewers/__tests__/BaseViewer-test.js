@@ -121,6 +121,53 @@ describe('lib/viewers/BaseViewer', () => {
 
             expect(base.loadBoxAnnotations).not.toBeCalled();
         });
+
+        test('should call applyAccessibilityScale with option value during setup', () => {
+            jest.spyOn(base, 'addCommonListeners');
+            jest.spyOn(base, 'areAnnotationsEnabled').mockReturnValue(true);
+            jest.spyOn(base, 'loadBoxAnnotations').mockResolvedValue(undefined);
+            base.options.accessibilityScale = 1.5;
+            const applyAccessibilityScaleSpy = jest.spyOn(base, 'applyAccessibilityScale');
+
+            base.setup();
+
+            expect(applyAccessibilityScaleSpy).toHaveBeenCalledWith(1.5);
+        });
+    });
+
+    describe('applyAccessibilityScale()', () => {
+        beforeEach(() => {
+            jest.spyOn(base, 'addCommonListeners');
+            jest.spyOn(base, 'areAnnotationsEnabled').mockReturnValue(false);
+            jest.spyOn(base, 'loadBoxAnnotations').mockResolvedValue(undefined);
+            base.setup();
+        });
+
+        test('should set zoom style on containerEl when scale > 1', () => {
+            base.applyAccessibilityScale(1.5);
+            expect(base.containerEl.style.zoom).toBe(1.5);
+        });
+
+        test('should store scale as this.accessibilityScale', () => {
+            base.applyAccessibilityScale(2);
+            expect(base.accessibilityScale).toBe(2);
+        });
+
+        test('should not set zoom when scale is 1', () => {
+            base.applyAccessibilityScale(1);
+            expect(base.containerEl.style.zoom).toBeFalsy();
+        });
+
+        test('should not set zoom when scale is undefined', () => {
+            base.applyAccessibilityScale(undefined);
+            expect(base.containerEl.style.zoom).toBeFalsy();
+        });
+
+        test('should not set zoom when containerEl is null', () => {
+            base.containerEl = null;
+            base.applyAccessibilityScale(1.5);
+            expect(base.accessibilityScale).toBeUndefined();
+        });
     });
 
     describe('setupLoading()', () => {

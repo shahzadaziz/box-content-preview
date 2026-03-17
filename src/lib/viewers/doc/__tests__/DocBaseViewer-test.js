@@ -1430,6 +1430,48 @@ describe('src/lib/viewers/doc/DocBaseViewer', () => {
             });
         });
 
+        describe('applyPdfAccessibilityScale()', () => {
+            test('should set pdfViewer scale to base scale times accessibilityScale when accessibilityScale > 1', () => {
+                const baseScale = 0.3125;
+                docBase.pdfViewer = { currentScale: baseScale, currentScaleValue: 'auto' };
+                docBase.accessibilityScale = 1.5;
+
+                docBase.applyPdfAccessibilityScale();
+
+                expect(docBase.pdfViewer.currentScaleValue).toBe(baseScale * 1.5);
+            });
+
+            test('should not change scale when accessibilityScale is 1 or undefined', () => {
+                docBase.pdfViewer = { currentScale: 0.5, currentScaleValue: 'auto' };
+                docBase.accessibilityScale = 1;
+                docBase.applyPdfAccessibilityScale();
+                expect(docBase.pdfViewer.currentScaleValue).toBe('auto');
+
+                docBase.accessibilityScale = undefined;
+                docBase.pdfViewer.currentScaleValue = 'auto';
+                docBase.applyPdfAccessibilityScale();
+                expect(docBase.pdfViewer.currentScaleValue).toBe('auto');
+            });
+
+            test('should clamp scaled value to MIN_SCALE and MAX_SCALE', () => {
+                docBase.pdfViewer = { currentScale: 0.05, currentScaleValue: 'auto' };
+                docBase.accessibilityScale = 2;
+                docBase.applyPdfAccessibilityScale();
+                expect(docBase.pdfViewer.currentScaleValue).toBe(MIN_SCALE);
+
+                docBase.pdfViewer = { currentScale: 6, currentScaleValue: 'auto' };
+                docBase.accessibilityScale = 2;
+                docBase.applyPdfAccessibilityScale();
+                expect(docBase.pdfViewer.currentScaleValue).toBe(MAX_SCALE);
+            });
+
+            test('should do nothing when pdfViewer is missing', () => {
+                docBase.pdfViewer = null;
+                docBase.accessibilityScale = 1.5;
+                expect(() => docBase.applyPdfAccessibilityScale()).not.toThrow();
+            });
+        });
+
         describe('onKeydown()', () => {
             beforeEach(() => {
                 stubs.previousPage = jest.spyOn(docBase, 'previousPage').mockImplementation();
@@ -2510,6 +2552,7 @@ describe('src/lib/viewers/doc/DocBaseViewer', () => {
             test('should load UI, check the pagination buttons, set the page, and make document scrollable', () => {
                 docBase.pdfViewer = {
                     currentScale: 'unknown',
+                    update: jest.fn(),
                 };
 
                 docBase.pagesinitHandler();
@@ -2522,6 +2565,7 @@ describe('src/lib/viewers/doc/DocBaseViewer', () => {
             test("should broadcast that the preview is loaded if it hasn't already", () => {
                 docBase.pdfViewer = {
                     currentScale: 'unknown',
+                    update: jest.fn(),
                 };
                 docBase.loaded = false;
                 docBase.pdfViewer.pagesCount = 5;
@@ -2542,6 +2586,7 @@ describe('src/lib/viewers/doc/DocBaseViewer', () => {
                 docBase.startPageNum = START_PAGE_NUM;
                 docBase.pdfViewer = {
                     pagesCount: PAGES_COUNT,
+                    update: jest.fn(),
                 };
                 docBase.pagesinitHandler();
 
@@ -2551,6 +2596,7 @@ describe('src/lib/viewers/doc/DocBaseViewer', () => {
             test('should set the current page and file length', () => {
                 docBase.pdfViewer = {
                     currentScale: 'unknown',
+                    update: jest.fn(),
                 };
                 docBase.pageTracker = new PageTracker({ isActive: true });
                 stubs.setCurrentPage = jest.spyOn(docBase.pageTracker, 'setCurrentPage').mockImplementation();
@@ -2563,6 +2609,7 @@ describe('src/lib/viewers/doc/DocBaseViewer', () => {
             test('should not call the PageTracker init function', () => {
                 docBase.pdfViewer = {
                     currentScale: 'unknown',
+                    update: jest.fn(),
                 };
                 docBase.pageTracker = new PageTracker({});
                 stubs.pageTrackerInit = jest.spyOn(docBase.pageTracker, 'init');
@@ -2573,6 +2620,7 @@ describe('src/lib/viewers/doc/DocBaseViewer', () => {
             test('should call the PageTracker init function', () => {
                 docBase.pdfViewer = {
                     currentScale: 'unknown',
+                    update: jest.fn(),
                 };
                 docBase.pageTracker = new PageTracker({ isActive: true });
                 stubs.pageTrackerInit = jest.spyOn(docBase.pageTracker, 'init');
